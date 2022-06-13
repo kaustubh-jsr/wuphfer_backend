@@ -1,14 +1,14 @@
-#Twitter Clone Backend API
+# Twitter Clone Backend API
 
 Wuphfer Backend - A twitter clone with (profile viewers 👀) option.
 
-##User:
+## User:
 
--Create Account
+- Create Account
 - See Profile
 - Login
 - Logout
 - Edit Profile
 - Follow User
 - Unfollow User
-- Change Avatar (Image Upload)
+- Edit Profile (Change Avatar, Cover Image, Bio)
