@@ -1,0 +1,1 @@
+web: gunicorn wuphfer_backend.wsgi
