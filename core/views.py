@@ -123,6 +123,7 @@ def user_profile(request):
                 return JsonResponse({'status':'ok','data':user_details},status=200)
             except:
                 return JsonResponse({'status':'failed','message':"User not found"},status=400) 
+        return JsonResponse({'status':'failed','message':"Bad Request"},status=405) 
     else:
         #update any fields posted to be changed from frontend
         #first check for unique fields(username,email) availablity,when user clicks update
