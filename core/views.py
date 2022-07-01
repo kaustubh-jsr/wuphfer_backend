@@ -133,8 +133,6 @@ def user_profile(request):
             auth_token = request.META["HTTP_AUTH_TOKEN"]
             try:
                 session = SessionStore(session_key=auth_token)
-                print(session.session_key)
-                print(request.POST)
                 user = User.objects.get(username = session['user_details']['username'])
                 # username = request.POST['username']
                 # if user.username != username:
@@ -189,6 +187,9 @@ def get_user_details(request):
                 user_details['username'] = user.username
                 user_details['email'] = user.email
                 user_details['bio'] = user.bio
+                # unread notifications flag, to show badge on bell icon
+                notifications = user.notifications.filter(seen=False)
+                user_details['unread_notifications'] = bool(notifications)
                 return JsonResponse({'status':'ok','user_details':user_details},status=200)
             except:
                 return JsonResponse({'status':'failed','message':"User not found"},status=400) 
@@ -202,7 +203,6 @@ def get_user_profile(request):
             try:
                 session = SessionStore(session_key=auth_token)
                 self_user = User.objects.get(username=session['user_details']['username'])
-                print(request.GET)
                 username = request.GET['username']
                 user = User.objects.get(username=username)
                 try:
@@ -254,6 +254,7 @@ def follow_unfollow_user(request):
                     other_user.num_of_followers -= 1
                     self_user.save()
                     other_user.save()
+                    notification = Notification.objects.create(type='follow',user=other_user,generator_username=self_user.username,parent_link=f'/{self_user.username}',text='unfollowed you')
                     return JsonResponse({'status':'ok','message':'Unfollow successfull'},status=200)
                 except:
                     # self does not follow
@@ -264,6 +265,7 @@ def follow_unfollow_user(request):
                     other_user.num_of_followers += 1
                     self_user.save()
                     other_user.save()
+                    notification = Notification.objects.create(type='follow',user=other_user,generator_username=self_user.username,parent_link=f'/{self_user.username}',text='followed you')
                     return JsonResponse({'status':'ok','message':'Follow successfull'},status=200)
             except:
                 return JsonResponse({'status':'failed','message':'Invalid usernames posted or invalid token.'},status=400)
@@ -320,14 +322,12 @@ def add_post(request):
             is_media = False if request.POST['is_media'] == 'false' else True
             image = request.POST['image'] if is_media else ""
             post = Post.objects.create(user=self_user,content=content,is_media=is_media,image=image)
-            new_post = {}
-            new_post['timestamp'] = post.timestamp
-            new_post['id']=post.id
+            new_post = generate_single_post_json(post,self_user)
             return JsonResponse({'status':'ok','message':"Post successfully saved.",'new_post':new_post},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
 
-def generate_single_post_json(post):
+def generate_single_post_json(post,current_user):
     post_di={}
     user = {}
     user['first_name'] = post.user.first_name
@@ -343,12 +343,17 @@ def generate_single_post_json(post):
     post_di['is_media'] = 1 if post.image else 0
     post_di['timestamp'] = post.timestamp
     post_di['id']=post.id
+    try:
+        post_di['is_bookmark'] = current_user.bookmarks.get(post=post)
+        post_di['is_bookmark'] = True
+    except:
+        post_di['is_bookmark'] = False
     return post_di
 
-def generate_post_json_for_post_queryset(posts):
+def generate_post_json_for_post_queryset(posts,current_user):
     postsFromDBList = []
     for post in posts:
-        new_post = generate_single_post_json(post)
+        new_post = generate_single_post_json(post,current_user)
         postsFromDBList.append(new_post)
     return postsFromDBList
 
@@ -383,7 +388,7 @@ def get_feed_posts(request):
             # a q lookup to get on posts to get the correct users
             # all follow objects where followee = self.user, get the post for the users
             # follow, need to update.
-            postsFromDBList = generate_post_json_for_post_queryset(feed_posts)
+            postsFromDBList = generate_post_json_for_post_queryset(feed_posts,self_user)
             return JsonResponse({'status':'ok','postsFromDB':postsFromDBList},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
@@ -449,7 +454,7 @@ def get_profile_data(request):
             username = request.GET['username']
             user = User.objects.get(username=username)
             profile_posts = Post.objects.filter(user=user).order_by('-timestamp')
-            postsFromDBList = generate_post_json_for_post_queryset(profile_posts)
+            postsFromDBList = generate_post_json_for_post_queryset(profile_posts,self_user)
             return JsonResponse({'status':'ok','profilePosts':postsFromDBList},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
@@ -466,7 +471,7 @@ def get_profile_media_posts(request):
             username = request.GET['username']
             user = User.objects.get(username=username)
             media_posts = Post.objects.filter(user=user,is_media=True).order_by('-timestamp')
-            postsFromDBList = generate_post_json_for_post_queryset(media_posts)
+            postsFromDBList = generate_post_json_for_post_queryset(media_posts,self_user)
             return JsonResponse({'status':'ok','mediaPosts':postsFromDBList},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
@@ -482,7 +487,107 @@ def get_post_detail(request):
                 return JsonResponse({'status':'failed','message':"User not in session"},status=400)
             post_id = request.GET['post_id']
             post = Post.objects.get(id=post_id)
-            post_di = generate_single_post_json(post)
+            post_di = generate_single_post_json(post,self_user)
             return JsonResponse({'status':'ok','post':post_di},status=200)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+@csrf_exempt
+def bookmark_unbookmark_post(request):
+    if request.method == "POST":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            try:
+                post = Post.objects.get(id=request.POST['post_id'])
+            except Post.DoesNotExist:
+                return JsonResponse({'status':'failed','message':"Post Id Expected"},status=400)
+            try:
+                old_bookmark = Bookmark.objects.get(post=post,user=self_user)
+                old_bookmark.delete()
+                return JsonResponse({'status':'removed','message':'Post removed from bookmarks.'},status=200)
+            except Bookmark.DoesNotExist:
+                Bookmark.objects.create(user=self_user,post=post)
+                return JsonResponse({'status':'added','message':'Post added to bookmarks.'},status=200)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+def get_bookmarks(request):
+    if request.method == "GET":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            try:
+                # get bookmarks for session  user here
+                bookmarks = Post.objects.filter(bookmark__user=self_user)
+                bookmarks_li = generate_post_json_for_post_queryset(bookmarks,self_user)
+                return JsonResponse({'status':'ok','bookmarks':bookmarks_li},status=200) 
+            except:
+                return JsonResponse({'status':'failed','message':"Post Id Expected"},status=400)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+def generate_notifications_li(notifications):
+    notifications_li = []
+    for notification in notifications:
+        generator_user = User.objects.get(username=notification.generator_username)
+        notification_di = {}
+        notification_di['id']=notification.id
+        notification_di['type']=notification.type
+        notification_di['text']=notification.text
+        notification_di['userFullName']=f'{generator_user.first_name} {generator_user.last_name}'
+        notification_di['postLink']=notification.parent_link
+        notification_di['userProfileLink']=f'/{notification.generator_username}'
+        notification_di['userProfilePhoto']=generator_user.profile_image
+        notification_di['seen']=notification.seen
+        notification_di['time']=notification.timestamp
+        notifications_li.append(notification_di)
+    return notifications_li
+
+def get_notifications(request):
+    if request.method == "GET":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            try:
+                # get notifications for session  user here
+                notifications = self_user.notifications.all().order_by('-timestamp')
+                notifications_li = generate_notifications_li(notifications)
+                return JsonResponse({'status':'ok','notifications':notifications_li},status=200) 
+            except:
+                return JsonResponse({'status':'failed','message':"Invalid user session"},status=400)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+def mark_notification_read(request):
+    if request.method == "GET":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            try:
+                # get notifications for session  user here
+                notifications = self_user.notifications.filter(seen=False)
+                for notif in notifications:
+                    notif.seen = True
+                    notif.save()
+                return JsonResponse({'status':'ok','message':'All unread notifications are marked read.'},status=200) 
+            except:
+                return JsonResponse({'status':'failed','message':"Invalid user session"},status=400)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)

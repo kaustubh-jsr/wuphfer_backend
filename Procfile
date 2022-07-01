@@ -1,1 +1,1 @@
-web: gunicorn wuphfer_backend.wsgi
+web: daphne wuphfer_backend.asgi:application -p $PORT -b 0.0.0.0 -v2

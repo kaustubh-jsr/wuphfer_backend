@@ -19,5 +19,7 @@ admin.site.register(Comment)
 admin.site.register(Like)
 admin.site.register(Activity)
 admin.site.register(Follow)
+admin.site.register(Bookmark)
+admin.site.register(Notification)
 
 

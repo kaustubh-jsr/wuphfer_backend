@@ -23,7 +23,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-ga(t6m6ie!_x_uy@jhfeq0o%hnzl3q+vhrtd($c)hhkky(_tg!'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
@@ -57,6 +57,7 @@ CORS_ALLOW_HEADERS = [
 
 INSTALLED_APPS = [
     "corsheaders",
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -181,3 +182,14 @@ try:
         DATABASES = {'default' : dj_database_url.config()}
 except:
     pass
+
+ASGI_APPLICATION = 'wuphfer_backend.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [os.environ.get('REDIS_ENDPOINT_URI','127.0.0.1:6379')],
+        },
+    },
+}

@@ -1,7 +1,11 @@
 from operator import mod
 from django.db import models
 from datetime import datetime
-
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from channels.layers import get_channel_layer
+from asgiref.sync import async_to_sync
+import json
 # Create your models here.
 
 
@@ -87,10 +91,76 @@ class Follow(models.Model):
     def __str__(self):
         return f'{self.follower} follows {self.followee}'
     
+
+class Bookmark(models.Model):
+    post = models.ForeignKey(Post,on_delete=models.CASCADE,related_name='bookmarks',related_query_name='bookmark')
+    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='bookmarks',related_query_name='bookmark')
     
+    def __str__(self):
+        return f'{self.user} bookmarked {self.post}'
     
+NOTIFICATION_CHOICES = (
+    ('like','like'),
+    ('comment','comment'),
+    ('rewuphf','rewuphf'),
+    ('follow','follow'),
+)
+
+class Notification(models.Model):
+    # notification can be of 3 types : 'like','comment','rewuphf','follow'
+    type = models.CharField(max_length=32,choices=NOTIFICATION_CHOICES,null=True,blank=True)
+    text = models.CharField(max_length=100,null=True,blank=True)
+    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='notifications',related_query_name='notification')
+    # The parent link could be link to the post which was liked, reposted, or commented on
+    # or in case of type follow, the link of generator_username
+    parent_link = models.CharField(max_length=256,null=True,blank=True)
+    generator_username = models.CharField(max_length=100,null=True,blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    seen = models.BooleanField(default=False)
     
+    def __str__(self) -> str:
+        return f'{self.generator_username} - engaged ({self.type}) with - {self.user.username}'
     
+    @staticmethod
+    def generate_notification_di(id):
+        notification = Notification.objects.get(id=id)
+        generator_user = User.objects.get(username=notification.generator_username)
+        notification_di = {}
+        notification_di['id']=notification.id
+        notification_di['type']=notification.type
+        notification_di['text']=notification.text
+        notification_di['userFullName']=f'{generator_user.first_name} {generator_user.last_name}'
+        notification_di['postLink']=notification.parent_link
+        notification_di['userProfileLink']=f'/{notification.generator_username}'
+        notification_di['userProfilePhoto']=generator_user.profile_image
+        notification_di['time']=notification.timestamp
+        return notification_di
+    
+@receiver(post_save,sender=Notification)
+def notification_created_handler(instance,created,**kwargs):
+    if created:
+        notification = instance
+        generator_user = User.objects.get(username=notification.generator_username)
+        notification_di = {}
+        notification_di['id']=notification.id
+        notification_di['type']=notification.type
+        notification_di['text']=notification.text
+        notification_di['userFullName']=f'{generator_user.first_name} {generator_user.last_name}'
+        channel_layer = get_channel_layer()
+        data = {'count':1,'current_notification':notification_di}
+        print('prepared data to be sent, now performing the async to sync call')
+        try:
+            async_to_sync(channel_layer.group_send)(f'user_{notification.user.username}',{
+                'type':'notification_send',
+                'value':notification_di,
+            })
+        except Exception as e:
+            print('error')
+            print(e)
+        print('async call complet,should call consumers')
+        print(notification.generator_username)
+        print(notification.user.username)
+        print(notification.seen)
 # class PostLike(models.Model):
 #     user = models.ForeignKey('User',on_delete=models.CASCADE)
 #     post = models.ForeignKey('Post',on_delete=models.CASCADE)
