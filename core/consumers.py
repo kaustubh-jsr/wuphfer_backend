@@ -9,20 +9,20 @@ class NotificationConsumer(WebsocketConsumer):
     def connect(self):
         auth_token =parse_qs(self.scope["query_string"].decode("utf-8"))['token'][0]
         print('connected')
-        try:
-            session = SessionStore(session_key=auth_token)
-            user = User.objects.get(username=session['user_details']['username'])
-            self.me = user
-            self.room_group_name = f'user_{self.me}'
-            print(f'connected to room : {self.room_group_name}')
-            self.accept()
-            async_to_sync(self.channel_layer.group_add)(
-                self.room_group_name,
-                self.channel_name
-            )
-        except:
-            print('invalid user, closing connection')
-            self.disconnect(0)
+        # try:
+        session = SessionStore(session_key=auth_token)
+        user = User.objects.get(username=session['user_details']['username'])
+        self.me = user
+        self.room_group_name = f'user_{self.me}'
+        print(f'connected to room : {self.room_group_name}')
+        self.accept()
+        async_to_sync(self.channel_layer.group_add)(
+            self.room_group_name,
+            self.channel_name
+        )
+        # except:
+        #     print('invalid user, closing connection')
+        #     self.disconnect(0)
     
     def receive(self,text_data):
         # self.send(text_data=json.dumps({'message_back':text_data}))
