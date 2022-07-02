@@ -185,28 +185,28 @@ except:
 
 ASGI_APPLICATION = 'wuphfer_backend.asgi.application'
 
-# CHANNEL_LAYERS = {
-#     'default': {
-#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#         'CONFIG': {
-#             "hosts": [f'rediss://:{os.environ.get("REDIS_PASSWORD")}@redis-15031.c212.ap-south-1-1.ec2.cloud.redislabs.com:15031'],
-#         },
-#     },
-# }
-import ssl
-new_context = ssl.SSLContext() # this sets the verify_mode to 'CERT_NONE'
-host = [{
-        'address': f'rediss://{os.environ.get("REDIS_ENDPOINT_URI")}', # don't miss the 'rediss'!
-        'password': os.environ.get("REDIS_PASSWORD"),
-        'ssl': new_context ,
-    }]
-
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": host,
+            "hosts": [f'rediss://:{os.environ.get("REDIS_PASSWORD")}@{os.environ.get("REDIS_URL")}'],
         },
-    }}
+    },
+}
+# import ssl
+# new_context = ssl.SSLContext() # this sets the verify_mode to 'CERT_NONE'
+# host = [{
+#         'address': f'rediss://{os.environ.get("REDIS_URL")}', # don't miss the 'rediss'!
+#         'password': os.environ.get("REDIS_PASSWORD"),
+#         'ssl': new_context ,
+#     }]
+
+# CHANNEL_LAYERS = {
+#     'default': {
+#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+#         'CONFIG': {
+#             "hosts": host,
+#         },
+#     }}
 
 
