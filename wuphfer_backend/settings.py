@@ -193,20 +193,8 @@ CHANNEL_LAYERS = {
         },
     },
 }
-# import ssl
-# new_context = ssl.SSLContext() # this sets the verify_mode to 'CERT_NONE'
-# host = [{
-#         'address': f'rediss://{os.environ.get("REDIS_URL")}', # don't miss the 'rediss'!
-#         'password': os.environ.get("REDIS_PASSWORD"),
-#         'ssl': new_context ,
-#     }]
+# major pro lem use redis:// not rediss:// which will give ssl error, and to avoid authentication
+# error add the redis password before url in the above format
 
-# CHANNEL_LAYERS = {
-#     'default': {
-#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#         'CONFIG': {
-#             "hosts": host,
-#         },
-#     }}
 
 
