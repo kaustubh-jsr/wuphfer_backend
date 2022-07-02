@@ -189,7 +189,7 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": ['redis://redis-15031.c212.ap-south-1-1.ec2.cloud.redislabs.com:15031'],
+            "hosts": [f'rediss://:{os.environ.get("REDIS_PASSWORD")}@redis-15031.c212.ap-south-1-1.ec2.cloud.redislabs.com:15031'],
         },
     },
 }
