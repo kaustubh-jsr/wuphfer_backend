@@ -48,9 +48,18 @@ class Post(models.Model):
     image = models.CharField(max_length=256,blank=True)
     is_media = models.BooleanField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    likes = models.IntegerField(default=0)
     
     def __str__(self):
         return f'{self.content[:30]}...'
+
+class PostLike(models.Model):
+    post = models.ForeignKey(Post,on_delete=models.CASCADE)
+    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='likes',related_query_name='like')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self) -> str:
+        return f'{self.user} liked {self.post.content[:10]}'
 
 class Comment(models.Model):
     text = models.TextField(blank=True)
@@ -59,23 +68,7 @@ class Comment(models.Model):
     
     def __str__(self):
         return f'{self.text[:5]}...'
-
-class Like(models.Model):
-    # if true, the activity_id will be of post, else of comment, useful to know where to look
-    # for parent
-    is_parent_post = models.BooleanField()
-    # This id can be either the pk of the post or pk of the comment
-    activity_id = models.IntegerField()
-    user = models.ForeignKey(User,on_delete=models.CASCADE)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    
-
-class Activity(models.Model):
-    # CAUTION : the below field is not the pk, and will have many same values across the table
-    # coz it can be for a comment or a post
-    is_activity_post = models.BooleanField()
-    activity_id = models.IntegerField()
-    no_of_likes = models.IntegerField()
+        
 
 class Follow(models.Model):
     # When unique_user_instance.following.all() is queried, we get all user objects for which the
@@ -117,6 +110,7 @@ class Notification(models.Model):
     generator_username = models.CharField(max_length=100,null=True,blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     seen = models.BooleanField(default=False)
+    notification_for_content = models.CharField(max_length=256,null=True,blank=True)
     
     def __str__(self) -> str:
         return f'{self.generator_username} - engaged ({self.type}) with - {self.user.username}'

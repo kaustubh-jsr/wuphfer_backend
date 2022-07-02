@@ -343,6 +343,12 @@ def generate_single_post_json(post,current_user):
     post_di['is_media'] = 1 if post.image else 0
     post_di['timestamp'] = post.timestamp
     post_di['id']=post.id
+    post_di['likes'] = post.likes
+    try:
+        post_di['is_liked'] = current_user.likes.get(post=post)
+        post_di['is_liked'] = True
+    except:
+        post_di['is_liked'] = False
     try:
         post_di['is_bookmark'] = current_user.bookmarks.get(post=post)
         post_di['is_bookmark'] = True
@@ -509,10 +515,10 @@ def bookmark_unbookmark_post(request):
             try:
                 old_bookmark = Bookmark.objects.get(post=post,user=self_user)
                 old_bookmark.delete()
-                return JsonResponse({'status':'removed','message':'Post removed from bookmarks.'},status=200)
+                return JsonResponse({'status':'removed','message':'Wuphf removed from bookmarks.'},status=200)
             except Bookmark.DoesNotExist:
                 Bookmark.objects.create(user=self_user,post=post)
-                return JsonResponse({'status':'added','message':'Post added to bookmarks.'},status=200)
+                return JsonResponse({'status':'added','message':'Wuphf added to bookmarks.'},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
 
@@ -549,6 +555,7 @@ def generate_notifications_li(notifications):
         notification_di['userProfilePhoto']=generator_user.profile_image
         notification_di['seen']=notification.seen
         notification_di['time']=notification.timestamp
+        notification_di['notificationForContent']=notification.notification_for_content
         notifications_li.append(notification_di)
     return notifications_li
 
@@ -589,5 +596,42 @@ def mark_notification_read(request):
                 return JsonResponse({'status':'ok','message':'All unread notifications are marked read.'},status=200) 
             except:
                 return JsonResponse({'status':'failed','message':"Invalid user session"},status=400)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+@csrf_exempt
+def like_unlike_post(request):
+    if request.method == "POST":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            try:
+                post = Post.objects.get(id=request.POST['post_id'])
+            except Post.DoesNotExist:
+                return JsonResponse({'status':'failed','message':"The post has been deleted."},status=400)
+            try:
+                prev_post_like = PostLike.objects.get(user=self_user,post=post)
+                post.likes-=1
+                post.save()
+                prev_post_like.delete()
+                return  JsonResponse({'status':'ok','message':'Post unliked successfully','likeStatus':'unliked','totalLikes':post.likes},status=200)
+            except PostLike.DoesNotExist:
+                post.likes+=1
+                post.save()
+                PostLike.objects.create(post=post,user=self_user)
+                other_user = post.user
+                if self_user != other_user:
+                    notification_link = f'/{post.user.username}/status/{post.id}'
+                    notification_for_content = post.content
+                    Notification.objects.create(type='like',user=other_user,
+                                                generator_username=self_user.username,
+                                                parent_link=notification_link,
+                                                text='liked your wuphf',
+                                                notification_for_content=notification_for_content)
+                return JsonResponse({'status':'ok','message':'Post liked successfully','likeStatus':'liked','totalLikes':post.likes},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)

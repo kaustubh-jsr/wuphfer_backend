@@ -1,6 +1,6 @@
 # Twitter Clone Backend API
 
-Wuphfer Backend - A twitter clone with (profile viewers 👀) option.
+Wuphfer Backend - A real time twitter clone with (profile viewers 👀) feature.
 
 ## User:
 
@@ -12,3 +12,12 @@ Wuphfer Backend - A twitter clone with (profile viewers 👀) option.
 - Follow User
 - Unfollow User
 - Edit Profile (Change Avatar, Cover Image, Bio)
+
+## Posts:
+
+- Create Post
+- Bookmark Post
+- Like/Unlike Post
+- Retweet Post
+- See Post Likes
+- See Post Retweets

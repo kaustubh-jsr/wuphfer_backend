@@ -18,6 +18,7 @@ urlpatterns = [
     path('get_profile_media_posts',get_profile_media_posts),
     path('get_post_detail',get_post_detail),
     path('bookmark_unbookmark_post',bookmark_unbookmark_post),
+    path('like_unlike_post',like_unlike_post),
     path('get_notifications',get_notifications),
     path('mark_notification_read',mark_notification_read),
     # path('get_posts',get_posts), 
