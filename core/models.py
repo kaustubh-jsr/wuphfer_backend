@@ -49,12 +49,12 @@ class Post(models.Model):
     is_media = models.BooleanField()
     timestamp = models.DateTimeField(auto_now_add=True)
     likes = models.IntegerField(default=0)
-    
+    comments_count = models.IntegerField(default=0)
     def __str__(self):
         return f'{self.content[:30]}...'
 
 class PostLike(models.Model):
-    post = models.ForeignKey(Post,on_delete=models.CASCADE)
+    post = models.ForeignKey(Post,on_delete=models.CASCADE,related_query_name='like')
     user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='likes',related_query_name='like')
     timestamp = models.DateTimeField(auto_now_add=True)
     
@@ -63,12 +63,21 @@ class PostLike(models.Model):
 
 class Comment(models.Model):
     text = models.TextField(blank=True)
-    post = models.ForeignKey(Post,on_delete=models.CASCADE)
+    post = models.ForeignKey(Post,on_delete=models.CASCADE,related_name='comments',related_query_name='comment')
+    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='comments',related_query_name='comment')
     timestamp = models.DateTimeField(auto_now_add=True)
+    likes = models.IntegerField(default=0)
     
     def __str__(self):
         return f'{self.text[:5]}...'
-        
+    
+class CommentLike(models.Model):
+    comment = models.ForeignKey(Comment,on_delete=models.CASCADE)
+    user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='commentLikes',related_query_name='commentLike')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self) -> str:
+        return f'{self.user} liked {self.comment.text[:10]}'
 
 class Follow(models.Model):
     # When unique_user_instance.following.all() is queried, we get all user objects for which the

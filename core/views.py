@@ -344,6 +344,7 @@ def generate_single_post_json(post,current_user):
     post_di['timestamp'] = post.timestamp
     post_di['id']=post.id
     post_di['likes'] = post.likes
+    post_di['comments_count'] = post.comments_count
     try:
         post_di['is_liked'] = current_user.likes.get(post=post)
         post_di['is_liked'] = True
@@ -482,6 +483,43 @@ def get_profile_media_posts(request):
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
 
+
+def get_profile_liked_posts(request):
+    if request.method == "GET":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            username = request.GET['username']
+            user = User.objects.get(username=username)
+            liked_posts = Post.objects.filter(like__user=user).distinct().order_by('-like__timestamp')
+            postsFromDBList = generate_post_json_for_post_queryset(liked_posts,self_user)
+            return JsonResponse({'status':'ok','likedPosts':postsFromDBList},status=200)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+
+def generate_single_comment_json(comment,current_user):
+    comment_di = {}
+    comment_di['id'] = comment.id
+    comment_di['user_profile_image'] = comment.user.profile_image
+    comment_di['user_full_name'] = comment.user.first_name + " " + comment.user.last_name
+    comment_di['user_username'] = comment.user.username
+    comment_di['post_username'] = comment.post.user.username
+    comment_di['text'] = comment.text
+    comment_di['likes'] = comment.likes
+    try:
+        comment_di['is_liked'] = current_user.commentLikes.get(comment=comment)
+        comment_di['is_liked'] = True
+    except:
+        comment_di['is_liked'] = False
+    comment_di['timestamp'] = comment.timestamp
+    return comment_di
+
+
 def get_post_detail(request):
     if request.method == "GET":
         if "HTTP_AUTH_TOKEN" in request.META:
@@ -494,7 +532,11 @@ def get_post_detail(request):
             post_id = request.GET['post_id']
             post = Post.objects.get(id=post_id)
             post_di = generate_single_post_json(post,self_user)
-            return JsonResponse({'status':'ok','post':post_di},status=200)
+            comments = post.comments.all()
+            comments_li = []
+            for comment in comments:
+                comments_li.append(generate_single_comment_json(comment,self_user))
+            return JsonResponse({'status':'ok','post':post_di,'comments':comments_li},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
 
@@ -633,5 +675,79 @@ def like_unlike_post(request):
                                                 text='liked your wuphf',
                                                 notification_for_content=notification_for_content)
                 return JsonResponse({'status':'ok','message':'Post liked successfully','likeStatus':'liked','totalLikes':post.likes},status=200)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+
+
+@csrf_exempt
+def add_comment(request):
+    if request.method == "POST":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+                user_in_session=True
+                post = Post.objects.get(id=request.POST['postId'])
+            except:
+                if not user_in_session:
+                    return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+                return JsonResponse({'status':'failed','message':"The wuphf has been deleted."},status=400)
+            text = request.POST['text']
+            comment = Comment.objects.create(user=self_user,
+                                             text=text,
+                                             post=post,
+                                             )
+            post.comments_count += 1
+            post.save()
+            new_comment = generate_single_comment_json(comment)
+            other_user = post.user
+            if self_user != other_user:
+                notification_link = f'/{post.user.username}/status/{post.id}'
+                notification_for_content = comment.text
+                Notification.objects.create(type='comment',user=other_user,
+                                            generator_username=self_user.username,
+                                            parent_link=notification_link,
+                                            text='replied to your wuphf',
+                                            notification_for_content=notification_for_content)
+            return JsonResponse({'status':'ok','message':"Your reply has been sent",'new_comment':new_comment},status=200)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+@csrf_exempt
+def like_unlike_comment(request):
+    if request.method == "POST":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            try:
+                comment = Comment.objects.get(id=request.POST['comment_id'])
+            except Comment.DoesNotExist:
+                return JsonResponse({'status':'failed','message':"The comment has been deleted."},status=400)
+            try:
+                prev_comment_like = CommentLike.objects.get(user=self_user,comment=comment)
+                comment.likes-=1
+                comment.save()
+                prev_comment_like.delete()
+                return  JsonResponse({'status':'ok','message':'Comment unliked successfully','likeStatus':'unliked','totalLikes':comment.likes},status=200)
+            except CommentLike.DoesNotExist:
+                comment.likes+=1
+                comment.save()
+                CommentLike.objects.create(comment=comment,user=self_user)
+                other_user = comment.user
+                if self_user != other_user:
+                    notification_link = f'/{comment.post.user.username}/status/{comment.post.id}'
+                    notification_for_content = comment.text
+                    Notification.objects.create(type='like',user=other_user,
+                                                generator_username=self_user.username,
+                                                parent_link=notification_link,
+                                                text='liked your reply',
+                                                notification_for_content=notification_for_content)
+                return JsonResponse({'status':'ok','message':'Comment liked successfully','likeStatus':'liked','totalLikes':comment.likes},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
