@@ -701,7 +701,7 @@ def add_comment(request):
                                              )
             post.comments_count += 1
             post.save()
-            new_comment = generate_single_comment_json(comment)
+            new_comment = generate_single_comment_json(comment,self_user)
             other_user = post.user
             if self_user != other_user:
                 notification_link = f'/{post.user.username}/status/{post.id}'
