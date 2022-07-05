@@ -21,6 +21,7 @@ urlpatterns = [
     path('bookmark_unbookmark_post',bookmark_unbookmark_post),
     path('like_unlike_post',like_unlike_post),
     path('like_unlike_comment',like_unlike_comment),
+    path('repost_undo_repost',repost_undo_repost),
     path('add_comment',add_comment),
     path('get_notifications',get_notifications),
     path('mark_notification_read',mark_notification_read),

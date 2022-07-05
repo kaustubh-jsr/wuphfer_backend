@@ -20,8 +20,9 @@ Wuphfer Backend - A real time twitter clone with (profile viewers 👀) feature.
 - Like/Unlike Post
 - Comment on Post
 - Like/Unlike Comment
-- Error toast on reaction(like/comment) on deleted post.
+- Error toast on reaction(like/comment/retweet) on deleted post.
 - Retweet Post
+- Notification on reaction(like/comment/retweet) to post/comment.
 - See Post Likes
 - See Post Retweets
 
@@ -30,6 +31,8 @@ Wuphfer Backend - A real time twitter clone with (profile viewers 👀) feature.
 - Home (Feed)
 - Profile(Self/Non Follower/Follower)
 - Notifications
+- Bookmarks
+- Explore
 
 ## Tech Stack
 

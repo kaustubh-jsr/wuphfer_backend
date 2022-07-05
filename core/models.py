@@ -43,6 +43,7 @@ class User(models.Model):
         
         
 class Post(models.Model):
+    parent = models.ForeignKey("self",on_delete=models.CASCADE,null=True,blank=True)
     user = models.ForeignKey(User,on_delete=models.CASCADE)
     content = models.TextField(blank=True)
     image = models.CharField(max_length=256,blank=True)
@@ -50,6 +51,12 @@ class Post(models.Model):
     timestamp = models.DateTimeField(auto_now_add=True)
     likes = models.IntegerField(default=0)
     comments_count = models.IntegerField(default=0)
+    share_count = models.IntegerField(default=0)
+    
+    @property
+    def is_repost(self):
+        return self.parent is not None
+    
     def __str__(self):
         return f'{self.content[:30]}...'
 

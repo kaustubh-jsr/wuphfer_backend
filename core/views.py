@@ -328,33 +328,94 @@ def add_post(request):
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
 
 def generate_single_post_json(post,current_user):
-    post_di={}
+    # diffrentiate a post and repost (tweet and retweet)
+    post_di = {}
     user = {}
-    user['first_name'] = post.user.first_name
-    user['last_name'] = post.user.last_name
-    user['profile_image'] = post.user.profile_image
-    user['cover_image'] = post.user.cover_image
-    user['bio'] = post.user.bio
-    user['username'] = post.user.username
-    user['full_name'] = f'{post.user.first_name} {post.user.last_name}'
-    post_di['user'] = user
-    post_di['content'] = post.content
-    post_di['image'] = post.image
-    post_di['is_media'] = 1 if post.image else 0
-    post_di['timestamp'] = post.timestamp
-    post_di['id']=post.id
-    post_di['likes'] = post.likes
-    post_di['comments_count'] = post.comments_count
-    try:
-        post_di['is_liked'] = current_user.likes.get(post=post)
-        post_di['is_liked'] = True
-    except:
-        post_di['is_liked'] = False
-    try:
-        post_di['is_bookmark'] = current_user.bookmarks.get(post=post)
-        post_di['is_bookmark'] = True
-    except:
-        post_di['is_bookmark'] = False
+    if post.is_repost:
+        # create json as per repost requirements
+        user['first_name'] = post.parent.user.first_name
+        user['last_name'] = post.parent.user.last_name
+        user['profile_image'] = post.parent.user.profile_image
+        user['cover_image'] = post.parent.user.cover_image
+        user['bio'] = post.parent.user.bio
+        user['username'] = post.parent.user.username
+        user['full_name'] = f'{post.parent.user.first_name} {post.parent.user.last_name}'
+        post_di['user'] = user
+        post_di['content'] = post.parent.content
+        post_di['image'] = post.parent.image
+        post_di['is_media'] = 1 if post.parent.image else 0
+        post_di['timestamp'] = post.parent.timestamp
+        post_di['id']=post.id
+        post_di['is_retweet'] = True
+        post_di['retweeted_by_fullname'] = f'{post.user.first_name} {post.user.last_name}'
+        post_di['retweeted_by_username'] = post.user.username
+        post_di['current_user_username'] = current_user.username
+        # below key could be True, if we encounter our own retweet in some place
+        # or retweet by someone where the parent post has been retweeted by us
+        # it will be false if we never retweeted the parent post,still i have doubts
+        # we are only checking the reposters username against current_user
+        # instead we want to check if there's any post by us
+        # where the parent of that post is this post's parent, if these two have 
+        # same parent tweets then both are retweets of the same post and below key should be true
+        # Another fault in the below comparison is that there could be a post which has been retweeted by you
+        # and another person you follow, but you enocunter that post as a retweet of another person
+        # then this logic will say retweeted_by_me is false, but it should be true, since you have retweeted the
+        # parent, so we need to compare whether there is a retweet by us whose parent is same as this retweets parent
+        # post_di['retweeted_by_me'] = post.user.username == current_user.username
+        try:
+            Post.objects.get(user=current_user,parent=post.parent)
+            post_di['retweeted_by_me'] = True
+        except Post.DoesNotExist:
+            post_di['retweeted_by_me'] = False
+        post_di['likes'] = post.parent.likes
+        post_di['share_count'] = post.parent.share_count
+        post_di['comments_count'] = post.parent.comments_count
+        try:
+            post_di['is_liked'] = current_user.likes.get(post=post.parent)
+            post_di['is_liked'] = True
+        except:
+            post_di['is_liked'] = False
+        try:
+            post_di['is_bookmark'] = current_user.bookmarks.get(post=post.parent)
+            post_di['is_bookmark'] = True
+        except:
+            post_di['is_bookmark'] = False
+    else:
+        user['first_name'] = post.user.first_name
+        user['last_name'] = post.user.last_name
+        user['profile_image'] = post.user.profile_image
+        user['cover_image'] = post.user.cover_image
+        user['bio'] = post.user.bio
+        user['username'] = post.user.username
+        user['full_name'] = f'{post.user.first_name} {post.user.last_name}'
+        post_di['user'] = user
+        post_di['content'] = post.content
+        post_di['image'] = post.image
+        post_di['is_media'] = 1 if post.image else 0
+        post_di['timestamp'] = post.timestamp
+        post_di['id']=post.id
+        post_di['is_retweet'] = False
+        post_di['retweeted_by'] = ''
+        post_di['retweeted_by_username'] = ''
+        post_di['current_user_username'] = current_user.username
+        try:
+            Post.objects.get(user=current_user,parent=post)
+            post_di['retweeted_by_me'] = True
+        except Post.DoesNotExist:
+            post_di['retweeted_by_me'] = False
+        post_di['likes'] = post.likes
+        post_di['share_count'] = post.share_count
+        post_di['comments_count'] = post.comments_count
+        try:
+            post_di['is_liked'] = current_user.likes.get(post=post)
+            post_di['is_liked'] = True
+        except:
+            post_di['is_liked'] = False
+        try:
+            post_di['is_bookmark'] = current_user.bookmarks.get(post=post)
+            post_di['is_bookmark'] = True
+        except:
+            post_di['is_bookmark'] = False
     return post_di
 
 def generate_post_json_for_post_queryset(posts,current_user):
@@ -389,7 +450,8 @@ def get_feed_posts(request):
             
             # getting posts made by users who have their follower list contain self_user as follower
             # or posts made by the current user
-            feed_posts = Post.objects.filter(Q(user__followers__follower=self_user)| Q(user=self_user) ).distinct().order_by('-timestamp').select_related('user')
+            # exclude the retweets done by current user, they show up only in profile
+            feed_posts = Post.objects.filter(Q(user__followers__follower=self_user)| Q(user=self_user,parent=None) ).distinct().order_by('-timestamp').select_related('user')
             # we need posts where the post__user is the self_user), 
             # or where post__user__following is the self_user
             # a q lookup to get on posts to get the correct users
@@ -519,6 +581,10 @@ def generate_single_comment_json(comment,current_user):
     comment_di['timestamp'] = comment.timestamp
     return comment_di
 
+def get_parent_if_repost(post):
+    if post.is_repost:
+        return post.parent
+    return post
 
 def get_post_detail(request):
     if request.method == "GET":
@@ -532,6 +598,10 @@ def get_post_detail(request):
             post_id = request.GET['post_id']
             post = Post.objects.get(id=post_id)
             post_di = generate_single_post_json(post,self_user)
+            # we need to get comments of the parent in case the post_id is of a repost
+            # other properties like like, retweet etc, are taken care of inn the generate_single_json... func
+            # so added the below line
+            post = get_parent_if_repost(post)
             comments = post.comments.all()
             comments_li = []
             for comment in comments:
@@ -539,6 +609,8 @@ def get_post_detail(request):
             return JsonResponse({'status':'ok','post':post_di,'comments':comments_li},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+
 
 @csrf_exempt
 def bookmark_unbookmark_post(request):
@@ -552,6 +624,7 @@ def bookmark_unbookmark_post(request):
                 return JsonResponse({'status':'failed','message':"User not in session"},status=400)
             try:
                 post = Post.objects.get(id=request.POST['post_id'])
+                post = get_parent_if_repost(post)
             except Post.DoesNotExist:
                 return JsonResponse({'status':'failed','message':"Post Id Expected"},status=400)
             try:
@@ -653,6 +726,7 @@ def like_unlike_post(request):
                 return JsonResponse({'status':'failed','message':"User not in session"},status=400)
             try:
                 post = Post.objects.get(id=request.POST['post_id'])
+                post = get_parent_if_repost(post)
             except Post.DoesNotExist:
                 return JsonResponse({'status':'failed','message':"The post has been deleted."},status=400)
             try:
@@ -689,7 +763,8 @@ def add_comment(request):
                 session = SessionStore(session_key=auth_token)
                 self_user = User.objects.get(username=session['user_details']['username'])
                 user_in_session=True
-                post = Post.objects.get(id=request.POST['postId'])
+                post = Post.objects.get(id=request.POST['post_id'])
+                post = get_parent_if_repost(post)
             except:
                 if not user_in_session:
                     return JsonResponse({'status':'failed','message':"User not in session"},status=400)
@@ -749,5 +824,57 @@ def like_unlike_comment(request):
                                                 text='liked your reply',
                                                 notification_for_content=notification_for_content)
                 return JsonResponse({'status':'ok','message':'Comment liked successfully','likeStatus':'liked','totalLikes':comment.likes},status=200)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+@csrf_exempt
+def repost_undo_repost(request):
+    '''
+    When reposting check whether the post
+    is already a repost, using post.is_repost
+    if it is get the parent post, post.parent
+    and repost it, if it is not a repost. repost as is
+    '''
+    if request.method == "POST":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            try:
+                post = Post.objects.get(id=request.POST['post_id'])
+                post = get_parent_if_repost(post)
+            except Post.DoesNotExist:
+                return JsonResponse({'status':'failed','message':"The post has been deleted."},status=400)
+            try:
+                # checking if the current_user has already reposted the post
+                # if it has just delete the prev reposted post, and decrease
+                # the share_count of the parent_post, which we got as post in the
+                # prev step.
+                prev_reposted_post = Post.objects.get(user=self_user,parent=post)
+                prev_reposted_post.delete()
+                post.share_count-=1
+                post.save()
+                return JsonResponse({'status':'ok','message':'Post unrewuphfed successfully','retweetStatus':'unretweeted','totalShares':post.share_count},status=200)
+            except Post.DoesNotExist:
+                # since the post was not reposted,repost it and update
+                # share count of the parent post,reposting means creating a new post
+                # with parent post as the post we got above
+                # and fill the new post with placeholder values for
+                # unnecessary fields for a repost.
+                repost = Post.objects.create(parent=post,user=self_user,content='',image='',is_media=False)
+                post.share_count += 1
+                post.save()
+                if self_user != post.user:
+                    notification_link = f'/{post.user.username}/status/{post.id}'
+                    notification_for_content = post.content
+                    Notification.objects.create(type='rewuphf',user=post.user,
+                                            generator_username=self_user.username,
+                                            parent_link=notification_link,
+                                            text='rewuphfed your wuphf',
+                                            notification_for_content=notification_for_content)
+                return JsonResponse({'status':'ok','message':'Post rewuphfed successfully','retweetStatus':'retweeted','totalShares':post.share_count},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
