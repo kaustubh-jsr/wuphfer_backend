@@ -633,7 +633,8 @@ def bookmark_unbookmark_post(request):
                 return JsonResponse({'status':'removed','message':'Wuphf removed from bookmarks.'},status=200)
             except Bookmark.DoesNotExist:
                 Bookmark.objects.create(user=self_user,post=post)
-                return JsonResponse({'status':'added','message':'Wuphf added to bookmarks.'},status=200)
+                post = generate_single_post_json(post,self_user)
+                return JsonResponse({'status':'added','message':'Wuphf added to bookmarks.','post':post},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
 
@@ -648,7 +649,7 @@ def get_bookmarks(request):
                 return JsonResponse({'status':'failed','message':"User not in session"},status=400)
             try:
                 # get bookmarks for session  user here
-                bookmarks = Post.objects.filter(bookmark__user=self_user)
+                bookmarks = Post.objects.filter(bookmark__user=self_user).order_by('-bookmark__timestamp')
                 bookmarks_li = generate_post_json_for_post_queryset(bookmarks,self_user)
                 return JsonResponse({'status':'ok','bookmarks':bookmarks_li},status=200) 
             except:
@@ -878,3 +879,11 @@ def repost_undo_repost(request):
                 return JsonResponse({'status':'ok','message':'Post rewuphfed successfully','retweetStatus':'retweeted','totalShares':post.share_count},status=200)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+
+def get_all_posts(request):
+    if request.method == "GET":
+        self_user = 1
+        posts = Post.objects.all().order_by('-timestamp')
+        posts = generate_post_json_for_post_queryset(posts=posts,current_user=self_user)
+        return

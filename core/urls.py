@@ -19,6 +19,7 @@ urlpatterns = [
     path('get_profile_liked_posts',get_profile_liked_posts),
     path('get_post_detail',get_post_detail),
     path('bookmark_unbookmark_post',bookmark_unbookmark_post),
+    path('get_bookmarks',get_bookmarks),
     path('like_unlike_post',like_unlike_post),
     path('like_unlike_comment',like_unlike_comment),
     path('repost_undo_repost',repost_undo_repost),

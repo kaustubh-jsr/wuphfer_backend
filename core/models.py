@@ -104,6 +104,7 @@ class Follow(models.Model):
 class Bookmark(models.Model):
     post = models.ForeignKey(Post,on_delete=models.CASCADE,related_name='bookmarks',related_query_name='bookmark')
     user = models.ForeignKey(User,on_delete=models.CASCADE,related_name='bookmarks',related_query_name='bookmark')
+    timestamp = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
         return f'{self.user} bookmarked {self.post}'
