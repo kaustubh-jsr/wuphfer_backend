@@ -158,11 +158,13 @@ def user_profile(request):
                 profile_image = request.POST['profile_image']
                 cover_image = request.POST['cover_image']
                 bio = request.POST['bio']
+                website = request.POST['website']
                 user.first_name = first_name
                 user.last_name = last_name
                 user.profile_image = profile_image
                 user.cover_image = cover_image
                 user.bio = bio
+                user.website = website
                 user.save()
                 return JsonResponse({'status':'ok','message':'Profile updated successfully.'},status=200)
             except:
@@ -187,6 +189,7 @@ def get_user_details(request):
                 user_details['username'] = user.username
                 user_details['email'] = user.email
                 user_details['bio'] = user.bio
+                user_details['website'] = user.website
                 # unread notifications flag, to show badge on bell icon
                 notifications = user.notifications.filter(seen=False)
                 user_details['unread_notifications'] = bool(notifications)
@@ -223,6 +226,7 @@ def get_user_profile(request):
                 user_details['username'] = user.username
                 user_details['email'] = user.email
                 user_details['bio'] = user.bio
+                user_details['website'] = user.website
                 user_details['doj'] = user.created_at
                 user_details['num_of_followers'] = user.num_of_followers
                 user_details['num_of_following'] = user.num_of_following

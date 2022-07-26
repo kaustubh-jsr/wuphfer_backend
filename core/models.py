@@ -22,6 +22,7 @@ class User(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     num_of_followers = models.IntegerField(default=0)
     num_of_following = models.IntegerField(default=0)
+    website = models.CharField(max_length=200,null=True,blank=True)
     
     def __str__(self):
         return self.username
