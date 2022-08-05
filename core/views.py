@@ -887,7 +887,16 @@ def repost_undo_repost(request):
 
 def get_all_posts(request):
     if request.method == "GET":
-        self_user = 1
-        posts = Post.objects.all().order_by('-timestamp')
-        posts = generate_post_json_for_post_queryset(posts=posts,current_user=self_user)
-        return
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+                posts = Post.objects.all().order_by('-timestamp')
+                posts = generate_post_json_for_post_queryset(posts=posts,current_user=self_user)
+                return JsonResponse({'status':'ok','explorePosts':posts},status=200) 
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+        return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+        
