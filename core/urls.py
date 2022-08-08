@@ -27,6 +27,7 @@ urlpatterns = [
     path('get_notifications',get_notifications),
     path('mark_notification_read',mark_notification_read),
     path('get_all_posts',get_all_posts),
+    path('delete_post',delete_post),
     # path('get_posts',get_posts), 
     # path('generate_and_send_otp',generate_and_send_otp), 
     # path('verify_otp',verify_otp), 

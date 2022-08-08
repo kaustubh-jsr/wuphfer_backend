@@ -852,7 +852,7 @@ def repost_undo_repost(request):
                 post = Post.objects.get(id=request.POST['post_id'])
                 post = get_parent_if_repost(post)
             except Post.DoesNotExist:
-                return JsonResponse({'status':'failed','message':"The post has been deleted."},status=400)
+                return JsonResponse({'status':'failed','message':"The post has been deleted.",'retweetStatus':'unretweeted','totalShares':0},status=400)
             try:
                 # checking if the current_user has already reposted the post
                 # if it has just delete the prev reposted post, and decrease
@@ -899,4 +899,23 @@ def get_all_posts(request):
                 return JsonResponse({'status':'failed','message':"User not in session"},status=400)
         return JsonResponse({'status':'failed','message':"User not in session"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
-        
+
+@csrf_exempt
+def delete_post(request):
+    if request.method == "POST":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            try:
+                post = Post.objects.get(id=request.POST['post_id'])
+                post = get_parent_if_repost(post)
+                post.delete()
+                return JsonResponse({'status':'deleted','message':'Wuphf deleted successfully'},status=200)
+            except Post.DoesNotExist:
+                return JsonResponse({'status':'failed','message':"The post has been deleted."},status=400)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
