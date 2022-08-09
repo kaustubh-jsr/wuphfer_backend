@@ -577,6 +577,7 @@ def generate_single_comment_json(comment,current_user):
     comment_di['post_username'] = comment.post.user.username
     comment_di['text'] = comment.text
     comment_di['likes'] = comment.likes
+    comment_di['current_user_username'] = current_user.username
     try:
         comment_di['is_liked'] = current_user.commentLikes.get(comment=comment)
         comment_di['is_liked'] = True
@@ -917,5 +918,24 @@ def delete_post(request):
                 return JsonResponse({'status':'deleted','message':'Wuphf deleted successfully'},status=200)
             except Post.DoesNotExist:
                 return JsonResponse({'status':'failed','message':"The post has been deleted."},status=400)
+        return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
+    return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
+
+@csrf_exempt
+def delete_comment(request):
+    if request.method == "POST":
+        if "HTTP_AUTH_TOKEN" in request.META:
+            auth_token = request.META["HTTP_AUTH_TOKEN"]
+            try:
+                session = SessionStore(session_key=auth_token)
+                self_user = User.objects.get(username=session['user_details']['username'])
+            except:
+                return JsonResponse({'status':'failed','message':"User not in session"},status=400)
+            try:
+                comment = Comment.objects.get(id=request.POST['comment_id'])
+                comment.delete()
+                return JsonResponse({'status':'deleted','message':'Comment deleted successfully'},status=200)
+            except Comment.DoesNotExist:
+                return JsonResponse({'status':'failed','message':"The comment has been deleted."},status=400)
         return JsonResponse({'status':'failed','message':"Auth token expected"},status=400)
     return JsonResponse({'status':'failed','message':"Bad Request"},status=405)
