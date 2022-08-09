@@ -934,6 +934,9 @@ def delete_comment(request):
             try:
                 comment = Comment.objects.get(id=request.POST['comment_id'])
                 comment.delete()
+                post = comment.post
+                post.comments_count -= 1
+                post.save()
                 return JsonResponse({'status':'deleted','message':'Comment deleted successfully'},status=200)
             except Comment.DoesNotExist:
                 return JsonResponse({'status':'failed','message':"The comment has been deleted."},status=400)
