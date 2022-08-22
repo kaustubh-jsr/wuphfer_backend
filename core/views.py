@@ -748,7 +748,7 @@ def like_unlike_post(request):
                 other_user = post.user
                 if self_user != other_user:
                     notification_link = f'/{post.user.username}/status/{post.id}'
-                    notification_for_content = post.content
+                    notification_for_content = f'{post.content[:200]}...'
                     Notification.objects.create(type='like',user=other_user,
                                                 generator_username=self_user.username,
                                                 parent_link=notification_link,
